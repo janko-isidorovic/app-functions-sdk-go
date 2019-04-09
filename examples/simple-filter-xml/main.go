@@ -20,17 +20,19 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/edgexfoundry/app-functions-sdk-go/pkg/edgexsdk"
-	"github.com/edgexfoundry/app-functions-sdk-go/pkg/excontext"
+	"github.com/edgexfoundry/app-functions-sdk-go/appcontext"
+	"github.com/edgexfoundry/app-functions-sdk-go/appsdk"
 )
 
 const (
 	serviceKey = "sampleFilterXml"
 )
 
+var counter int = 0
+
 func main() {
 	// 1) First thing to do is to create an instance of the EdgeX SDK and initialize it.
-	edgexSdk := &edgexsdk.AppFunctionsSDK{ServiceKey: serviceKey}
+	edgexSdk := &appsdk.AppFunctionsSDK{ServiceKey: serviceKey}
 	if err := edgexSdk.Initialize(); err != nil {
 		edgexSdk.LoggingClient.Error(fmt.Sprintf("SDK initialization failed: %v\n", err))
 		os.Exit(-1)
@@ -48,18 +50,32 @@ func main() {
 		printXMLToConsole,
 	)
 
-	// 4) Lastly, we'll go ahead and tell the SDK to "start" and begin listening for events
+	// 4) shows how to access the application's specific configuration settings.
+	appSettings := edgexSdk.ApplicationSettings()
+	if appSettings != nil {
+		appName, ok := appSettings["ApplicationName"]
+		if ok {
+			edgexSdk.LoggingClient.Info(fmt.Sprintf("%s now running...", appName))
+		} else {
+			edgexSdk.LoggingClient.Error("ApplicationName application setting not found")
+			os.Exit(-1)
+		}
+	} else {
+		edgexSdk.LoggingClient.Error("No application settings found")
+		os.Exit(-1)
+	}
+
+	// 5) Lastly, we'll go ahead and tell the SDK to "start" and begin listening for events
 	// to trigger the pipeline.
 	edgexSdk.MakeItRun()
 }
 
-func printXMLToConsole(edgexcontext excontext.Context, params ...interface{}) (bool, interface{}) {
+func printXMLToConsole(edgexcontext *appcontext.Context, params ...interface{}) (bool, interface{}) {
 	if len(params) < 1 {
 		// We didn't receive a result
 		return false, nil
 	}
-
-	println(params[0].(string))
-	edgexcontext.Complete(params[0].(string))
+	fmt.Println(params[0].(string))
+	edgexcontext.Complete([]byte(params[0].(string)))
 	return false, nil
 }
